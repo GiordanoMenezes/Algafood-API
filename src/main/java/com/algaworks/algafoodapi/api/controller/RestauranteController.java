@@ -1,10 +1,9 @@
 package com.algaworks.algafoodapi.api.controller;
 
-import java.util.Set;
+import java.util.Collection;
 
 import javax.validation.Valid;
 
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,8 +18,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.algaworks.algafoodapi.api.assemblerDTO.RestauranteAssembler;
+import com.algaworks.algafoodapi.api.assemblerDTO.RestauranteDisassembler;
+import com.algaworks.algafoodapi.api.model.RestauranteDTO;
+import com.algaworks.algafoodapi.api.model.RestauranteInputDTO;
 import com.algaworks.algafoodapi.domain.exception.CozinhaNaoEncontradaException;
 import com.algaworks.algafoodapi.domain.exception.NegocioException;
+import com.algaworks.algafoodapi.domain.model.Cozinha;
 import com.algaworks.algafoodapi.domain.model.Restaurante;
 import com.algaworks.algafoodapi.domain.repository.RestauranteRepository;
 import com.algaworks.algafoodapi.domain.service.CadastroRestauranteService;
@@ -36,38 +40,53 @@ public class RestauranteController {
 	@Autowired
 	private CadastroRestauranteService cadRestService;
 
+	@Autowired
+	private RestauranteAssembler restauranteAssembler;
+
+	@Autowired
+	private RestauranteDisassembler restauranteDisassembler;
+
 	@GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-	public Set<Restaurante> listar() {
-		return restRepo.listAll();
+	public Collection<RestauranteDTO> listar() {
+		return restauranteAssembler.toCollectionDTO(restRepo.listAll());
 	}
 
 	@GetMapping("/{id}")
-	public Restaurante buscar(@PathVariable Long id) {
-       return cadRestService.buscarOuFalhar(id);
+	public RestauranteDTO buscar(@PathVariable Long id) {
+		return restauranteAssembler.toDTO(cadRestService.buscarOuFalhar(id));
 	}
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public Restaurante adicionar(@RequestBody @Valid Restaurante restaurante) {
+	public RestauranteDTO adicionar(@RequestBody @Valid RestauranteInputDTO restauranteInDTO) {
 		try {
-		return cadRestService.salvar(restaurante);
+			Restaurante restSalvar = restauranteDisassembler.toDomain(restauranteInDTO);
+			return restauranteAssembler.toDTO(cadRestService.salvar(restSalvar));
 		} catch (CozinhaNaoEncontradaException enex) {
 			throw new NegocioException(enex.getMessage());
 		}
 	}
 
 	@PutMapping("/{id}")
-	public Restaurante atualizar(@PathVariable Long id, @RequestBody @Valid Restaurante restaurante) {
+	public RestauranteDTO atualizar(@PathVariable Long id, @RequestBody @Valid RestauranteInputDTO restauranteInDTO) {
 
-		Restaurante restAtualizar = cadRestService.buscarOuFalhar(id);
-		BeanUtils.copyProperties(restaurante, restAtualizar, "id", "formasPagamento", "endereco", "dataCadastro",
-				"produtos");
-		
-     try {
-		return cadRestService.salvar(restAtualizar);
-     } catch (CozinhaNaoEncontradaException enex) {
-    	 throw new NegocioException(enex.getMessage());
-     }
+		try {
+			Restaurante restAtualizar = cadRestService.buscarOuFalhar(id);
+
+			// Quando alteramos o id da cozinha, passando um novo id de cozinha em
+			// restInDTO, o JPA entenderá que estamos querendo substituir
+			// uma chave primária de uma entidade existente, e gerará um erro. Pra evitar
+			// isso, instanciamos uma nova cozinha.
+			// Como cozinha é obrigatório na atualização, não há perigo em deletar o
+			// registro de cozinha, caso o usuario deixasse cozinha sem informar.
+			restAtualizar.setCozinha(new Cozinha());
+
+			restauranteDisassembler.updateObject(restauranteInDTO, restAtualizar);
+
+			return restauranteAssembler.toDTO(cadRestService.salvar(restAtualizar));
+		} catch (CozinhaNaoEncontradaException enex) {
+			throw new NegocioException(enex.getMessage());
+		}
 	}
 
 	@DeleteMapping("/{id}")

@@ -1,6 +1,6 @@
 package com.algaworks.algafoodapi.api.exceptionhandler;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -212,7 +212,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	// Caso viemos a incluir novos campos no ErrorOutput, devemos acrescentar aqui
 	private ErrorOutput.ErrorOutputBuilder createErrorOutput(HttpStatus status, ErrorType errorType, String detail) {
 
-		return ErrorOutput.builder().datetime(LocalDateTime.now()).status(status.value()).type(errorType.getUri())
+		return ErrorOutput.builder().datetime(OffsetDateTime.now()).status(status.value()).type(errorType.getUri())
 				.title(errorType.getTitle()).detail(detail);
 	}
 
